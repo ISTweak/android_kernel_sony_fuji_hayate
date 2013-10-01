@@ -42,6 +42,19 @@
 #define LOGW(fmt...) printk(KERN_WARNING "[lulzactive] " fmt)
 #define LOGD(fmt...) printk(KERN_DEBUG "[lulzactive] " fmt)
 
+#ifdef MODULE
+#include <linux/kallsyms.h>
+static unsigned long (*gm_nr_running)(void);
+static int (*gm_sched_setscheduler_nocheck)(struct task_struct *, int,
+                              const struct sched_param *);
+static void (*gm___put_task_struct)(struct task_struct *t);
+static int (*gm_wake_up_process)(struct task_struct *tsk);
+#define nr_running (*gm_nr_running)
+#define put_task_struct (*gm___put_task_struct)
+#define wake_up_process (*gm_wake_up_process)
+#define sched_setscheduler_nocheck (*gm_sched_setscheduler_nocheck)
+#endif
+
 static void (*pm_idle_old)(void);
 static atomic_t active_count = ATOMIC_INIT(0);
 
