@@ -30,6 +30,19 @@
 
 #include <asm/cputime.h>
 
+#ifdef MODULE
+#include <linux/kallsyms.h>
+static int (*gm_sched_setscheduler_nocheck)(struct task_struct *, int,
+                              const struct sched_param *);
+static void (*gm___put_task_struct)(struct task_struct *t);
+static int (*gm_wake_up_process)(struct task_struct *tsk);
+#define put_task_struct (*gm___put_task_struct)
+#define wake_up_process (*gm_wake_up_process)
+#define sched_setscheduler_nocheck (*gm_sched_setscheduler_nocheck)
+#endif
+
+//sched_setscheduler_nocheck(up_task, SCHED_FIFO, &param);
+
 static atomic_t active_count = ATOMIC_INIT(0);
 
 struct cpufreq_interactive_cpuinfo {
