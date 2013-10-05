@@ -1017,30 +1017,11 @@ static int cpufreq_governor_lulzactive(struct cpufreq_policy *new_policy,
 }
 
 static void lulzactive_early_suspend(struct early_suspend *handler) {
-	struct cpufreq_lulzactive_cpuinfo *pcpu;
-	unsigned int min_freq, max_freq;
-	
 	early_suspended = 1;
-	
-	if (debug_mode & LULZACTIVE_DEBUG_EARLY_SUSPEND) {
-		LOGI("%s\n", __func__);
-		
-		pcpu = &per_cpu(cpuinfo, 0);
-		
-		min_freq = pcpu->policy->min;
-		
-		max_freq = min(pcpu->policy->max, pcpu->freq_table[screen_off_min_step].frequency);
-		max_freq = max(max_freq, min_freq);
-		
-		LOGI("lock @%u~@%uMHz\n", min_freq / 1000, max_freq / 1000);
-	}
 }
 
 static void lulzactive_late_resume(struct early_suspend *handler) {
 	early_suspended = 0;
-	if (debug_mode & LULZACTIVE_DEBUG_EARLY_SUSPEND) {
-		LOGI("%s\n", __func__);
-	}
 }
 
 static struct early_suspend lulzactive_power_suspend = {
@@ -1119,6 +1100,12 @@ static int __init cpufreq_lulzactive_init(void)
 	early_suspended = 0;
 	suspending = 0;
 	screen_off_min_step = DEFAULT_SCREEN_OFF_MIN_STEP;
+#ifdef MODULE
+	gm_sched_setscheduler_nocheck = (int (*)(struct task_struct *, int,
+		const struct sched_param *))kallsyms_lookup_name("sched_setscheduler_nocheck");
+	gm___put_task_struct = (void (*)(struct task_struct *))kallsyms_lookup_name("__put_task_struct");
+	gm_wake_up_process = (int (*)(struct task_struct *))kallsyms_lookup_name("wake_up_process");
+#endif
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
@@ -1146,11 +1133,6 @@ static int __init cpufreq_lulzactive_init(void)
 	INIT_WORK(&freq_scale_down_work,
 		  cpufreq_lulzactive_freq_down);
 
-#if DEBUG
-	spin_lock_init(&dbgpr_lock);
-	dbg_proc = create_proc_entry("igov", S_IWUSR | S_IRUGO, NULL);
-	dbg_proc->read_proc = dbg_proc_read;
-#endif
 	spin_lock_init(&down_cpumask_lock);
 	spin_lock_init(&up_cpumask_lock);
 	
@@ -1172,6 +1154,12 @@ module_init(cpufreq_lulzactive_init);
 
 static void __exit cpufreq_lulzactive_exit(void)
 {
+#ifdef MODULE
+	gm_sched_setscheduler_nocheck = (int (*)(struct task_struct *, int,
+		const struct sched_param *))kallsyms_lookup_name("sched_setscheduler_nocheck");
+	gm___put_task_struct = (void (*)(struct task_struct *))kallsyms_lookup_name("__put_task_struct");
+	gm_wake_up_process = (int (*)(struct task_struct *))kallsyms_lookup_name("wake_up_process");
+#endif
 	cpufreq_unregister_governor(&cpufreq_gov_lulzactive);
 	unregister_early_suspend(&lulzactive_power_suspend);
 	unregister_pm_notifier(&lulzactive_pm_notifier);
