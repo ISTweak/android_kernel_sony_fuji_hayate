@@ -804,6 +804,9 @@ static int __init cpufreq_gov_dbs_init(void)
 static void __exit cpufreq_gov_dbs_exit(void)
 {
     cpufreq_unregister_governor(&cpufreq_gov_lazy);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+    unregister_early_suspend(&lazy_suspend);
+#endif
 }
 
 
