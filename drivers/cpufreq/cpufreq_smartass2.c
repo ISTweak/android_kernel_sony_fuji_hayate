@@ -804,10 +804,6 @@ static struct early_suspend smartass_power_suspend = {
 
 static int __init cpufreq_smartass_init(void)
 {
-#ifdef MODULE
-	gm_nr_running = (unsigned long (*)(void))kallsyms_lookup_name("nr_running");
-#endif
-
 	unsigned int i;
 	struct smartass_info_s *this_smartass;
 	debug_mask = 0;
@@ -821,6 +817,9 @@ static int __init cpufreq_smartass_init(void)
 	ramp_down_step = DEFAULT_RAMP_DOWN_STEP;
 	max_cpu_load = DEFAULT_MAX_CPU_LOAD;
 	min_cpu_load = DEFAULT_MIN_CPU_LOAD;
+#ifdef MODULE
+	gm_nr_running = (unsigned long (*)(void))kallsyms_lookup_name("nr_running");
+#endif
 
 	spin_lock_init(&cpumask_lock);
 
@@ -868,8 +867,8 @@ static void __exit cpufreq_smartass_exit(void)
 #ifdef MODULE
 	gm_nr_running = (unsigned long (*)(void))kallsyms_lookup_name("nr_running");
 #endif
-
 	cpufreq_unregister_governor(&cpufreq_gov_smartass2);
+	unregister_early_suspend(&smartass_power_suspend);
 	destroy_workqueue(up_wq);
 	destroy_workqueue(down_wq);
 }
