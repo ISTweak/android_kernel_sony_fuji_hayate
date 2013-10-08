@@ -32,16 +32,6 @@
 #include <asm/cputime.h>
 #include <linux/suspend.h>
 
-#define LULZACTIVE_VERSION	(2)
-#define LULZACTIVE_AUTHOR	"tegrak"
-
-// if you changed some codes for optimization, just write your name here.
-#define LULZACTIVE_TUNER "cmbaughman"
-
-#define LOGI(fmt...) printk(KERN_INFO "[lulzactive] " fmt)
-#define LOGW(fmt...) printk(KERN_WARNING "[lulzactive] " fmt)
-#define LOGD(fmt...) printk(KERN_DEBUG "[lulzactive] " fmt)
-
 #ifdef MODULE
 #include <linux/kallsyms.h>
 static unsigned long (*gm_nr_running)(void);
@@ -54,6 +44,18 @@ static int (*gm_wake_up_process)(struct task_struct *tsk);
 #define wake_up_process (*gm_wake_up_process)
 #define sched_setscheduler_nocheck (*gm_sched_setscheduler_nocheck)
 #endif
+
+#define LULZACTIVE_VERSION	(2)
+#define LULZACTIVE_AUTHOR	"tegrak"
+
+// if you changed some codes for optimization, just write your name here.
+#define LULZACTIVE_TUNER "cmbaughman"
+
+#define LOGI(fmt...) printk(KERN_INFO "[lulzactive] " fmt)
+#define LOGW(fmt...) printk(KERN_WARNING "[lulzactive] " fmt)
+#define LOGD(fmt...) printk(KERN_DEBUG "[lulzactive] " fmt)
+
+
 
 static void (*pm_idle_old)(void);
 static atomic_t active_count = ATOMIC_INIT(0);
