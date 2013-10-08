@@ -34,6 +34,13 @@
 #define INTELLIDEMAND_VERSION	3.0
 
 extern unsigned long avg_nr_running(void);
+#ifdef MODULE
+#include <linux/kallsyms.h>
+static int (*gm_lock_policy_rwsem_write)(int cpu);
+static void (*gm_unlock_policy_rwsem_write)(int cpu);
+#define lock_policy_rwsem_write (*gm_lock_policy_rwsem_write)
+#define unlock_policy_rwsem_write (*gm_unlock_policy_rwsem_write)
+#endif
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -1078,35 +1085,6 @@ unsigned long get_lmf_inactive_load(void)
 }
 #endif
 
-#define NR_FSHIFT	1
-static unsigned int nr_run_thresholds[] = {
-/* 	1,  2 - on-line cpus target */
-	5,  UINT_MAX /* avg run threads * 2 (e.g., 9 = 2.25 threads) */
-	};
-
-static unsigned int nr_run_hysteresis = 8;  /* 0.5 thread */
-static unsigned int nr_run_last;
-
-static unsigned int calculate_thread_stats (void)
-{
-	unsigned int avg_nr_run = avg_nr_running();
-	unsigned int nr_run;
-
-	for (nr_run = 1; nr_run < ARRAY_SIZE(nr_run_thresholds); nr_run++) {
-		unsigned int nr_threshold = nr_run_thresholds[nr_run - 1];
-		if (nr_run_last <= nr_run)
-			nr_threshold += nr_run_hysteresis;
-		if (avg_nr_run <= (nr_threshold << (FSHIFT - NR_FSHIFT)))
-			break;
-	}
-	nr_run_last = nr_run;
-
-	return nr_run;
-}
-
-static unsigned int persist_count = 0;
-static unsigned int rq_persist_count = 0;
-
 static void do_dbs_timer(struct work_struct *work)
 {
 	struct cpu_dbs_info_s *dbs_info =
@@ -1115,11 +1093,9 @@ static void do_dbs_timer(struct work_struct *work)
 	int sample_type = dbs_info->sample_type;
 
 	int delay;
-	unsigned int nr_run_stat;
 
-	nr_run_stat = calculate_thread_stats();
+#ifdef CONFIG_CPUFREQ_LIMIT_MAX_FREQ
 
-#if 1
 	if (cpu == BOOT_CPU && lmf_screen_state) {
 		switch (nr_run_stat) {
 			case 1:
@@ -1152,11 +1128,6 @@ static void do_dbs_timer(struct work_struct *work)
 	else
 		lmf_browsing_state = true;
 
-#endif
-
-	//pr_info("Run Queue Average: %u\n", rq_info.rq_avg);
-
-#ifdef CONFIG_CPUFREQ_LIMIT_MAX_FREQ
 	if (!lmf_browsing_state && lmf_screen_state)
 	{
 		if (cpu == BOOT_CPU)
@@ -1165,12 +1136,6 @@ static void do_dbs_timer(struct work_struct *work)
 			{
 				pr_warn("LMF: disabled!\n");
 				lmf_old_state = false;
-#if 0
-				/* wake up the 2nd core */
-				if (num_online_cpus() < 2)
-					cpu_up(1);
-#endif
-
 			}
 
 			if (!active_state)
@@ -1284,11 +1249,7 @@ static void do_dbs_timer(struct work_struct *work)
 								msecs_limit_total = 0;
 								load_limit_index = 0;
 								active_state = false;
-#if 0
-								/* wake up the 2nd core */
-								if (num_online_cpus() < 2)
-									cpu_up(1);
-#endif
+
 								/* set freq to 1.0GHz */
 								pr_info("LMF: CPU0 set max freq to: %lu\n", lmf_inactive_max_limit);
 								cpufreq_set_limits(BOOT_CPU, SET_MAX, lmf_inactive_max_limit);
@@ -1302,12 +1263,6 @@ static void do_dbs_timer(struct work_struct *work)
 							else
 							{
 								msecs_limit_total = ACTIVE_DURATION_MSEC; // to prevent overflow
-#if 0
-								/* take 2nd core offline */
-								if (num_online_cpus() > 1)
-									cpu_down(1);
-#endif
-
 							}
 						}
 					}
@@ -1447,9 +1402,6 @@ static void dbs_refresh_callback(struct work_struct *unused)
 	}
 
 	if (policy->cur < DBS_INPUT_EVENT_MIN_FREQ) {
-		/*
-		pr_info("%s: set cpufreq to DBS_INPUT_EVENT_MIN_FREQ(%d) directly due to input events!\n", __func__, DBS_INPUT_EVENT_MIN_FREQ);
-		*/
 		__cpufreq_driver_target(policy, DBS_INPUT_EVENT_MIN_FREQ,
 					CPUFREQ_RELATION_L);
 		this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
@@ -1680,6 +1632,11 @@ static int __init cpufreq_gov_dbs_init(void)
 	u64 idle_time;
 	unsigned int i;
 	int cpu = get_cpu();
+
+#ifdef MODULE
+	gm_lock_policy_rwsem_write = (int (*)(int cpu))kallsyms_lookup_name("lock_policy_rwsem_write");
+	gm_unlock_policy_rwsem_write = (void (*)(int cpu))kallsyms_lookup_name("unlock_policy_rwsem_write");
+#endif
 
 	idle_time = get_cpu_idle_time_us(cpu, &wall);
 	put_cpu();
